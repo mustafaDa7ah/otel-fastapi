@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import List, Optional
-from .use_cases import PipeDTO  # for typing only
+from app.app.application.use_cases import PipeDTO
 
 class IPipeRepository(ABC):
     @abstractmethod
