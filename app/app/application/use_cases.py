@@ -2,12 +2,7 @@ from dataclasses import dataclass
 from typing import List
 from opentelemetry import trace, metrics
 from .interfaces import IPipeRepository
-
-@dataclass
-class PipeDTO:
-    id: int
-    status: str
-
+from .dto import PipeDTO   # 👈 import DTO here
 
 class PipeUseCases:
     def __init__(self, repo: IPipeRepository):
