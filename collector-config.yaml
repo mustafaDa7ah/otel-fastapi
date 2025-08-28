@@ -11,8 +11,11 @@ processors:
 exporters:
   clickhouse:
     # native TCP protocol
-    endpoint: tcp://clickhouse:9000?dial_timeout=10s
+    endpoint: tcp://clickhouse:9000
     database: otel
+    username: default
+    password: ""
+    ttl_days: 3
     async_insert: true
     ttl: 72h
     compress: lz4
