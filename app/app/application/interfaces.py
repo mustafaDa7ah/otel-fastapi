@@ -1,0 +1,19 @@
+from abc import ABC, abstractmethod
+from typing import List, Optional
+from .use_cases import PipeDTO  # for typing only
+
+class IPipeRepository(ABC):
+    @abstractmethod
+    async def create(self, pipe: PipeDTO) -> PipeDTO: ...
+    @abstractmethod
+    async def get(self, id: int) -> Optional[PipeDTO]: ...
+    @abstractmethod
+    async def list(self) -> List[PipeDTO]: ...
+
+class IPipeUseCases(ABC):
+    @abstractmethod
+    async def create_pipe(self) -> PipeDTO: ...
+    @abstractmethod
+    async def get_pipe(self, id: int) -> PipeDTO: ...
+    @abstractmethod
+    async def list_pipes(self) -> list[PipeDTO]: ...
