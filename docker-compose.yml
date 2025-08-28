@@ -13,31 +13,31 @@ services:
     depends_on:
       - collector
 
-  collector:
-    image: otel/opentelemetry-collector-contrib:0.104.0
-    container_name: otel-collector
-    command: ["--config=/etc/otel-collector-config.yaml"]
-    volumes:
-      - ./collector-config.yaml:/etc/otel-collector-config.yaml:ro
-    ports:
-      - "4318:4318"   # OTLP HTTP
+  otel-collector:
+      image: otel/opentelemetry-collector-contrib:0.104.0
+      command: ["--config=/etc/otel-collector-config.yaml"]
+      volumes:
+        - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
+      depends_on:
+        clickhouse:
+          condition: service_healthy
+      ports:
+        - "4317:4317"   # gRPC OTLP
+        - "4318:4318"   # HTTP OTLP
+        - "8888:8888"   # Collector metrics
 
   clickhouse:
-    image: clickhouse/clickhouse-server:latest
-    container_name: clickhouse
-    environment:
-      CLICKHOUSE_DB: otel
-      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
-    ports:
-      - "8123:8123"   # HTTP
-      - "9000:9000"   # Native
-    volumes:
-      - ch_data:/var/lib/clickhouse
-    # keep resources reasonable on laptops
-    ulimits:
-      nofile:
-        soft: 262144
-        hard: 262144
+      image: clickhouse/clickhouse-server:23.8
+      ports:
+        - "8123:8123"   # HTTP
+        - "9000:9000"   # Native
+      volumes:
+        - ch_data:/var/lib/clickhouse
+      healthcheck:
+        test: ["CMD", "clickhouse-client", "--query=SELECT 1"]
+        interval: 5s
+        timeout: 3s
+        retries: 5
 
 volumes:
   ch_data:
