@@ -12,7 +12,7 @@ services:
     environment:
       CLICKHOUSE_DB: otel
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8123/ping"]
+      test: ["CMD-SHELL", "clickhouse-client --host 127.0.0.1 --query='SELECT 1' || exit 1"]
       interval: 5s
       timeout: 10s
       retries: 10
