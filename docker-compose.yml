@@ -1,43 +1,51 @@
-version: "3.9"
+version: '3.8'
+
 services:
-  api:
-    build: ./app
-    container_name: otel-fastapi
+  # ClickHouse Database 
+  clickhouse:
+    image: clickhouse/clickhouse-server:23.9
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
     environment:
-      OTEL_SERVICE_NAME: pipes-service
-      OTEL_EXPORTER_OTLP_ENDPOINT: http://collector:4318
+      CLICKHOUSE_DB: otel
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8123/ping"]
+      interval: 5s
+      timeout: 10s
+      retries: 10
+
+  # OpenTelemetry Collector 
+  collector:
+    image: otel/opentelemetry-collector-contrib:0.86.0
+    ports:
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+      - "8889:8889"   # Prometheus metrics
+      - "13133:13133" # Health check
+    volumes:
+      - ./collector/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    restart: on-failure
+
+  # FastAPI Application 
+  app:
+    build: .
     ports:
       - "8000:8000"
-    volumes:
-      - ./app/app:/app/app:cached
+    environment:
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://collector:4318
+      - OTEL_SERVICE_NAME=fastapi-app
     depends_on:
-      - collector
-
-  otel-collector:
-      image: otel/opentelemetry-collector-contrib:0.104.0
-      command: ["--config=/etc/otel-collector-config.yaml"]
-      volumes:
-        - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml
-      depends_on:
-        clickhouse:
-          condition: service_healthy
-      ports:
-        - "4317:4317"   # gRPC OTLP
-        - "4318:4318"   # HTTP OTLP
-        - "8888:8888"   # Collector metrics
-
-  clickhouse:
-      image: clickhouse/clickhouse-server:23.8
-      ports:
-        - "8123:8123"   # HTTP
-        - "9000:9000"   # Native
-      volumes:
-        - ch_data:/var/lib/clickhouse
-      healthcheck:
-        test: ["CMD", "clickhouse-client", "--query=SELECT 1"]
-        interval: 5s
-        timeout: 3s
-        retries: 5
+      collector:
+        condition: service_started
+    volumes:
+      - .:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 volumes:
-  ch_data:
+  clickhouse_data:
