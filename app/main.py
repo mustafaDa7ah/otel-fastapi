@@ -1,3 +1,4 @@
+from app.core.telemetry import setup_telemetry
 from fastapi import FastAPI, Depends, HTTPException
 import logging
 import random
@@ -128,3 +129,6 @@ async def error_test():
         raise HTTPException(status_code=500, detail="Simulated error")
     logger.info("Error test endpoint succeeded")
     return {"message": "No error this time"}
+
+
+    
