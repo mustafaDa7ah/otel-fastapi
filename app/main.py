@@ -1,13 +1,15 @@
+from fastapi import FastAPI, Depends, HTTPException
 import logging
 import random
 import time
-from fastapi import FastAPI, Depends, HTTPException
-from opentelemetry import trace
 from contextlib import asynccontextmanager
 from uuid import UUID
+from opentelemetry import trace
 
 from opentelemetry.metrics import get_meter
-
+from app.domain.models import User
+from app.use_cases.user_use_cases import UserUseCases
+from app.infrastructure.repositories import MockUserRepository
 
 # SETUP METRICS AND TRACING
 meter = get_meter(__name__)

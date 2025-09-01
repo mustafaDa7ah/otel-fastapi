@@ -17,6 +17,8 @@ tracer = trace.get_tracer(__name__)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
+
+
 class UserModel(Base):
     __tablename__ = "users"
     id = Column(String, primary_key=True)
