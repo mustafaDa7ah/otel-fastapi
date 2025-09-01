@@ -6,14 +6,26 @@ from opentelemetry import trace
 from contextlib import asynccontextmanager
 from uuid import UUID
 
-from app.core.telemetry import setup_telemetry
-from app.domain.models import User
-from app.infrastructure.repositories import MockUserRepository
-from app.use_cases.user_use_cases import UserUseCases
+from opentelemetry.metrics import get_meter
 
-# Logger setup
+
+# SETUP METRICS AND TRACING
+meter = get_meter(__name__)
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
+
+# DEFINE COUNTERS 
+positive_counter = meter.create_counter(
+    name="positive_counter",
+    description="Total number of positive numbers returned",
+    unit="1",
+)
+
+negative_counter = meter.create_counter(
+    name="negative_counter",
+    description="Total number of negative numbers returned",
+    unit="1",
+)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -30,6 +42,18 @@ try:
 except Exception as e:
     logger.error(f"OpenTelemetry setup failed: {e}")
     tracer_provider, logger_provider = None, None
+
+# return positive OR nagative number
+@app.get("/random-number")
+async def random_number():
+    number = random.randint(-10, 10)
+    if number >= 0:
+        positive_counter.add(1)
+        logger.info(f"Generated positive number: {number}")
+    else:
+        negative_counter.add(1)
+        logger.info(f"Generated negative number: {number}")
+    return {"number": number}
 
 # Use Mock Repository
 def get_user_repository():
