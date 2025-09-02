@@ -1,6 +1,7 @@
 # app/core/telemetry.py
 import os, socket, logging, multiprocessing
 from contextvars import ContextVar
+from typing import Optional  # Add this import
 
 from opentelemetry import trace, metrics
 from opentelemetry.sdk.resources import Resource
@@ -20,13 +21,18 @@ from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExp
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
 # context vars (used by a middleware you'll add in main.py)
-request_id_ctx: ContextVar[str | None] = ContextVar("request_id", default=None)
+request_id_ctx: ContextVar[Optional[str]] = ContextVar("request_id", default=None)  # Fixed line 23
 
 # compute stable worker identity
 _HOST = socket.gethostname()
 _PID = os.getpid()
 WORKER_ID = os.getenv("WORKER_ID", f"{_HOST}-{_PID}")
 SERVICE_INSTANCE_ID = os.getenv("SERVICE_INSTANCE_ID", WORKER_ID)
+
+def get_logger_provider():
+    # helper so handler can reference configured provider
+    from opentelemetry._logs import get_logger_provider as _g
+    return _g()
 
 def _root_logger_with_worker() -> logging.Logger:
     logger = logging.getLogger()
@@ -54,11 +60,6 @@ def _root_logger_with_worker() -> logging.Logger:
     if not any(isinstance(f, _WorkerContextFilter) for f in logger.filters):
         logger.addFilter(_WorkerContextFilter())
     return logger
-
-def get_logger_provider():
-    # helper so handler can reference configured provider
-    from opentelemetry._logs import get_logger_provider as _g
-    return _g()
 
 def setup_telemetry(app, service_name: str = "fastapi-app"):
     # where to send OTLP (collector in docker-compose; override in env if needed)

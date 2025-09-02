@@ -2,6 +2,7 @@
 import logging, random, time, os
 from uuid import UUID, uuid4
 from contextlib import asynccontextmanager
+from typing import Optional
 
 from fastapi import FastAPI, Depends, HTTPException, Request
 
@@ -89,7 +90,7 @@ async def random_number():
 
 # --- pipeline demo: shows worker.id in spans, logs & metrics ---
 @app.post("/pipeline/run")
-async def run_pipeline(pipeline_id: str | None = None, steps: int = 3):
+async def run_pipeline(pipeline_id: Optional[str] = None, steps: int = 3):
     pipeline_id = pipeline_id or f"pl-{uuid4().hex[:8]}"
     start = time.perf_counter()
     pipeline_runs.add(1, attributes={"worker.id": WORKER_ID, "pipeline.id": pipeline_id})
