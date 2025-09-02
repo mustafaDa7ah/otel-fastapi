@@ -79,13 +79,13 @@ async def root():
 @app.get("/random-number")
 async def random_number():
     number = random.randint(-10, 10)
-    attrs = {"worker.id": WORKER_ID, "number": number, "sign": "positive" if number >= 0 else "negative"}
+    attrs = {"attributes": {"worker.id": WORKER_ID, "number": number, "sign": "positive" if number >= 0 else "negative"}}
     if number >= 0:
         positive_counter.add(1, attributes=attrs)
-        logger.info("Generated positive number", extra={"number": number})
+        logger.info("Generated positive number", extra={"attributes": {"number": number}})
     else:
         negative_counter.add(1, attributes=attrs)
-        logger.info("Generated negative number", extra={"number": number})
+        logger.info("Generated negative number", extra={"attributes": {"number": number}})
     return {"number": number, "worker_id": WORKER_ID}
 
 # --- pipeline demo: shows worker.id in spans, logs & metrics ---
@@ -99,16 +99,16 @@ async def run_pipeline(pipeline_id: Optional[str] = None, steps: int = 3):
         "pipeline.run",
         attributes={"pipeline.id": pipeline_id, "worker.id": WORKER_ID, "steps": steps}
     ) as span:
-        logger.info("pipeline.start", extra={"pipeline_id": pipeline_id, "steps": steps})
+        logger.info("pipeline.start", extra={"attributes": {"pipeline_id": pipeline_id, "steps": steps }})
         for ix in range(1, steps + 1):
             with tracer.start_as_current_span("pipeline.step", attributes={"step": ix}):
                 delay = random.uniform(0.1, 0.6)
                 time.sleep(delay)
-                logger.info("pipeline.step.done", extra={"step": ix, "took_s": round(delay, 3)})
-        logger.info("pipeline.end", extra={"pipeline_id": pipeline_id})
+                logger.info("pipeline.step.done", extra={"attributes": {"step": ix, "took_s": round(delay, 3)}})
+        logger.info("pipeline.end", extra={"attributes": {"pipeline_id": pipeline_id}})
 
     dur = time.perf_counter() - start
-    pipeline_duration.record(dur, attributes={"worker.id": WORKER_ID, "pipeline.id": pipeline_id})
+    pipeline_duration.record(dur, attributes={"attributes": {"worker.id": WORKER_ID, "pipeline.id": pipeline_id}})
     return {"pipeline_id": pipeline_id, "worker_id": WORKER_ID, "duration_s": round(dur, 3)}
 
 # --- your existing user endpoints (unchanged) ---
