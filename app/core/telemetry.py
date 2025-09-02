@@ -1,7 +1,7 @@
 # app/core/telemetry.py
 import os, socket, logging, multiprocessing
 from contextvars import ContextVar
-from typing import Optional  # Add this import
+from typing import Optional
 
 from opentelemetry import trace, metrics
 from opentelemetry.sdk.resources import Resource
@@ -21,13 +21,24 @@ from opentelemetry.exporter.otlp.proto.http.metric_exporter import OTLPMetricExp
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 
 # context vars (used by a middleware you'll add in main.py)
-request_id_ctx: ContextVar[Optional[str]] = ContextVar("request_id", default=None)  # Fixed line 23
+request_id_ctx: ContextVar[Optional[str]] = ContextVar("request_id", default=None)
 
 # compute stable worker identity
 _HOST = socket.gethostname()
 _PID = os.getpid()
 WORKER_ID = os.getenv("WORKER_ID", f"{_HOST}-{_PID}")
 SERVICE_INSTANCE_ID = os.getenv("SERVICE_INSTANCE_ID", WORKER_ID)
+
+# Filter to enrich every record with worker + per-request ids
+class _WorkerContextFilter(logging.Filter):
+    def filter(self, record: logging.LogRecord) -> bool:
+        # These become entries in LogAttributes in ClickHouse
+        setattr(record, "worker_id", WORKER_ID)
+        setattr(record, "service_instance_id", SERVICE_INSTANCE_ID)
+        rid = request_id_ctx.get()
+        if rid:
+            setattr(record, "request_id", rid)
+        return True
 
 def get_logger_provider():
     # helper so handler can reference configured provider
@@ -45,18 +56,15 @@ def _root_logger_with_worker() -> logging.Logger:
         handler = LoggingHandler(level=logging.INFO, logger_provider=get_logger_provider())
         logger.addHandler(handler)
 
-    # Filter to enrich every record with worker + per-request ids
-    class _WorkerContextFilter(logging.Filter):
-        def filter(self, record: logging.LogRecord) -> bool:
-            # These become entries in LogAttributes in ClickHouse
-            setattr(record, "worker_id", WORKER_ID)
-            setattr(record, "service_instance_id", SERVICE_INSTANCE_ID)
-            rid = request_id_ctx.get()
-            if rid:
-                setattr(record, "request_id", rid)
-            return True
-
     # prevent stacking duplicate filters on reload
+    if not any(isinstance(f, _WorkerContextFilter) for f in logger.filters):
+        logger.addFilter(_WorkerContextFilter())
+    return logger
+
+def get_logger_with_context(name: str = None) -> logging.Logger:
+    """Get a logger with worker context filter already applied"""
+    logger = logging.getLogger(name)
+    # Add worker context filter if not already present
     if not any(isinstance(f, _WorkerContextFilter) for f in logger.filters):
         logger.addFilter(_WorkerContextFilter())
     return logger
