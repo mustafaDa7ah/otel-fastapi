@@ -1,0 +1,73 @@
+version: '3.8'
+
+services:
+  # ClickHouse Database 
+  clickhouse:
+    image: clickhouse/clickhouse-server:23.9
+    ports:
+      - "8123:8123"
+      - "9000:9000"
+    volumes:
+      - clickhouse_data:/var/lib/clickhouse
+      - ./init-clickhouse.sql:/docker-entrypoint-initdb.d/init.sql 
+    environment:
+      CLICKHOUSE_DB: otel
+      CLICKHOUSE_USER: default
+      CLICKHOUSE_PASSWORD: password
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8123/ping"]
+      interval: 10s
+      timeout: 20s
+      retries: 15
+      start_period: 30s
+    networks:
+      - otel-network
+
+  # OpenTelemetry Collector 
+  collector:
+    image: otel/opentelemetry-collector-contrib:latest
+    ports:
+      - "4317:4317"   # OTLP gRPC
+      - "4318:4318"   # OTLP HTTP
+      - "8889:8889"   # Prometheus metrics
+      - "13133:13133" # Health check
+      - "8888:8888"   # Metrics endpoint (from your logs)
+    volumes:
+      - ./collector/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+    restart: unless-stopped
+    networks:
+      - otel-network
+    # Add explicit links for DNS resolution
+    links:
+      - clickhouse:clickhouse
+
+  # FastAPI Application 
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://collector:4318/v1/traces
+      - OTEL_SERVICE_NAME=fastapi-app
+      - OTEL_LOGS_EXPORTER=otlp 
+      - OTEL_METRICS_EXPORTER=otlp  
+      - OTEL_METRIC_EXPORT_INTERVAL=5000 
+    depends_on:
+      collector:
+        condition: service_started
+    volumes:
+      - .:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+    networks:
+      - otel-network
+
+volumes:
+  clickhouse_data:
+
+networks:
+  otel-network:
+    driver: bridge

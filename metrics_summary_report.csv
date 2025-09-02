@@ -1,0 +1,4 @@
+"MetricName","total_records","total_count","first_occurrence","last_occurrence"
+"negative_numbers_total",11,11,"2025-09-01 22:05:12","2025-09-01 22:13:42"
+"positive_numbers_total",7,7,"2025-09-01 22:05:12","2025-09-01 22:13:42"
+"http.server.active_requests",4,0,"2025-09-01 22:05:07","2025-09-01 22:13:42"
