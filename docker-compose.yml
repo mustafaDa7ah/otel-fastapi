@@ -1,7 +1,6 @@
 version: '3.8'
 
 services:
-  # OpenTelemetry Collector 
   collector:
     image: otel/opentelemetry-collector-contrib:0.86.0
     ports:
@@ -16,7 +15,6 @@ services:
     #     condition: service_healthy
     restart: on-failure
 
-  # FastAPI Application 
   app:
     build: .
     ports:
@@ -36,30 +34,52 @@ services:
     environment:
       ZOOKEEPER_CLIENT_PORT: 2181
       ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - app-network
+    healthcheck:
+      test: echo stat | nc localhost 2181 || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 10
 
   kafka:
     image: confluentinc/cp-kafka:7.4.0
     depends_on:
-      - zookeeper
+      zookeeper:
+        condition: service_healthy
     environment:
       KAFKA_BROKER_ID: 1
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
       KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'  # Add this!
     ports:
       - "9092:9092"
+    networks:
+      - app-network
+    healthcheck:
+      test: nc -z localhost 9092 || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 40s
 
   kafka-consumer:
     build: .
-    command: python -m app.consumer_start
+    command: >
+      sh -c "sleep 20 && python -m app.consumer_start"
     environment:
       - OTEL_EXPORTER_OTLP_ENDPOINT=http://collector:4318
       - WORKER_ID=kafka-consumer-1
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
     depends_on:
-      - kafka
-      - collector
+      kafka:
+        condition: service_healthy
+      collector:
+        condition: service_started
     networks:
-      - app-network  
+      - app-network
+    restart: on-failure  # Add restart policy
 
 volumes:
   clickhouse_data:
