@@ -47,6 +47,19 @@ services:
       - .:/app
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
+
+    kafka-consumer:
+    build: .
+    command: python -m app.consumer_start
+    environment:
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://collector:4318
+      - WORKER_ID=kafka-consumer-1
+    depends_on:
+      - kafka
+      - collector
+    networks:
+      - app-network
+      
   # grafana:
   #   image: grafana/grafana:10.0.0
   #   ports:

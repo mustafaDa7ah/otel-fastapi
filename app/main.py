@@ -12,6 +12,7 @@ from app.core.telemetry import setup_telemetry, get_logger_with_context
 from app.domain.models import User
 from app.use_cases.user_use_cases import UserUseCases
 from app.infrastructure.repositories import MockUserRepository
+from app.infrastructure.kafka_producer import kafka_producer
 
 # Use the context-aware logger
 logger = get_logger_with_context(__name__)
@@ -111,3 +112,39 @@ async def run_pipeline(pipeline_id: Optional[str] = None, steps: int = 3):
     dur = time.perf_counter() - start
     pipeline_duration.record(dur, attributes={"worker.id": WORKER_ID, "pipeline.id": pipeline_id})
     return {"pipeline_id": pipeline_id, "worker_id": WORKER_ID, "duration_s": round(dur, 3)}
+
+
+@app.post("/pipeline/create-async")
+async def create_async_pipeline(steps: int = 3):
+    """Create pipeline that will be processed asynchronously"""
+    pipeline_id = f"async-pl-{uuid4().hex[:8]}"
+    
+    with tracer.start_as_current_span("pipeline.create.async"):
+        logger.info("Creating async pipeline", extra={
+            "attributes": {
+                "pipeline_id": pipeline_id,
+                "steps": steps,
+                "mode": "async"
+            }
+        })
+        
+        # Send to Kafka for async processing
+        message = {
+            "type": "pipeline_create",
+            "pipeline_id": pipeline_id,
+            "steps": steps,
+            "timestamp": time.time()
+        }
+        
+        kafka_producer.produce_message(
+            topic="pipelines",
+            key=pipeline_id,
+            value=message
+        )
+        
+        return {
+            "pipeline_id": pipeline_id,
+            "status": "queued",
+            "worker_id": WORKER_ID,
+            "message": "Pipeline sent for async processing"
+        }

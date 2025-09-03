@@ -3,6 +3,9 @@ import os, socket, logging, multiprocessing
 from contextvars import ContextVar
 from typing import Optional
 
+from opentelemetry.propagate import inject, extract
+from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
+
 from opentelemetry import trace, metrics
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
@@ -114,4 +117,28 @@ def setup_telemetry(app, service_name: str = "fastapi-app"):
     # auto-instrument FastAPI routes into spans
     FastAPIInstrumentor.instrument_app(app, tracer_provider=tracer_provider)
 
-    return tracer_provider, logger_provider, meter_provider, request_id_ctx, WORKER_ID
+    return tracer_provider, logger_provider, meter_provider, request_id_ctx, WORKER_ID 
+
+def get_propagated_context() -> dict:
+    """Extract context for propagation to other services"""
+    context = {}
+    # Add trace context
+    TraceContextTextMapPropagator().inject(context)
+    
+    # Add our custom context
+    rid = request_id_ctx.get()
+    if rid:
+        context['x-request-id'] = rid
+    context['x-worker-id'] = WORKER_ID
+    context['x-service-instance-id'] = SERVICE_INSTANCE_ID
+    
+    return context
+
+def set_propagated_context(context: dict):
+    """Set context from incoming propagation"""
+    # Set trace context
+    TraceContextTextMapPropagator().extract(context)
+    
+    # Set our custom context
+    if 'x-request-id' in context:
+        request_id_ctx.set(context['x-request-id'])
