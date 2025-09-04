@@ -118,11 +118,13 @@ async def run_pipeline(pipeline_id: Optional[str] = None, steps: int = 3):
 async def create_async_pipeline(steps: int = 3):
     """Create pipeline that will be processed asynchronously"""
     pipeline_id = f"async-pl-{uuid4().hex[:8]}"
+    request_id=f"request-{uuid4().hex[:8]}"
     
     with tracer.start_as_current_span("pipeline.create.async"):
         logger.info("Creating async pipeline", extra={
             # "attributes": {
                 "pipeline_id": pipeline_id,
+                "request_id": request_id,
                 "steps": steps,
                 "mode": "async",
                 "worker_id": WORKER_ID
@@ -134,7 +136,8 @@ async def create_async_pipeline(steps: int = 3):
             "type": "pipeline_create",
             "pipeline_id": pipeline_id,
             "steps": steps,
-            "timestamp": time.time()
+            "timestamp": time.time(),
+            "request_id": request_id
         }
         
         kafka_producer.produce_message(
@@ -148,6 +151,7 @@ async def create_async_pipeline(steps: int = 3):
             "status": "queued",
             "worker_id": WORKER_ID,
             "message": "Pipeline sent for async processing"
+            "request_id": request_id
         }
 
 @app.post("/message/send")
