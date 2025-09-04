@@ -121,11 +121,12 @@ async def create_async_pipeline(steps: int = 3):
     
     with tracer.start_as_current_span("pipeline.create.async"):
         logger.info("Creating async pipeline", extra={
-            "attributes": {
+            # "attributes": {
                 "pipeline_id": pipeline_id,
                 "steps": steps,
-                "mode": "async"
-            }
+                "mode": "async",
+                "worker_id": WORKER_ID
+            # }
         })
         
         # Send to Kafka for async processing
@@ -148,3 +149,33 @@ async def create_async_pipeline(steps: int = 3):
             "worker_id": WORKER_ID,
             "message": "Pipeline sent for async processing"
         }
+
+@app.post("/message/send")
+async def send_message(message: str, topic: str = "test-topic"):
+    """Send a simple message to Kafka"""
+    message_id = str(uuid4())
+    
+    with tracer.start_as_current_span("message.send"):
+        logger.info("Sending message to Kafka", extra={
+            "attributes": {
+                "message_id": message_id,
+                "topic": topic,
+                "message_length": len(message)
+            }
+        })
+        
+        kafka_producer.produce_message(
+            topic=topic,
+            key=message_id,
+            value={
+                "type": "user_message",
+                "content": message,
+                "sender": "fastapi-service"
+            }
+        )
+        
+        return {
+            "message_id": message_id,
+            "status": "sent",
+            "topic": topic
+        }        

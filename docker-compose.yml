@@ -84,3 +84,7 @@ services:
 volumes:
   clickhouse_data:
   # grafana_data:
+
+networks:
+  app-network:
+    driver: bridge
