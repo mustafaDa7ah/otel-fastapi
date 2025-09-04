@@ -1,22 +1,6 @@
 version: '3.8'
 
 services:
-  # # ClickHouse Database 
-  # clickhouse:
-  #   image: clickhouse/clickhouse-server:23.9
-  #   ports:
-  #     - "8123:8123"
-  #     - "9000:9000"
-  #   volumes:
-  #     - clickhouse_data:/var/lib/clickhouse
-  #   environment:
-  #     CLICKHOUSE_DB: otel
-  #   healthcheck:
-  #     test: ["CMD-SHELL", "clickhouse-client --host 127.0.0.1 --query='SELECT 1' || exit 1"]
-  #     interval: 5s
-  #     timeout: 10s
-  #     retries: 10
-
   # OpenTelemetry Collector 
   collector:
     image: otel/opentelemetry-collector-contrib:0.86.0
@@ -27,9 +11,8 @@ services:
       - "13133:13133" # Health check
     volumes:
       - ./collector/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml
-    # depends_on:
-    #   clickhouse:
-    #     condition: service_healthy
+    environment:
+      - HYPERDX_API_KEY=2332b044-2469-4bc1-8fba-b0867470eb84  # HyperDX API key added here
     restart: on-failure
 
   # FastAPI Application 
@@ -47,19 +30,5 @@ services:
       - .:/app
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
-  # grafana:
-  #   image: grafana/grafana:10.0.0
-  #   ports:
-  #     - "3000:3000"
-  #   environment:
-  #     - GF_SECURITY_ADMIN_USER=admin
-  #     - GF_SECURITY_ADMIN_PASSWORD=admin
-  #     - GF_INSTALL_PLUGINS=vertamedia-clickhouse-datasource
-  #   volumes:
-  #     - grafana_data:/var/lib/grafana
-  #   depends_on:
-  #     - clickhouse
-
 volumes:
   clickhouse_data:
-  # grafana_data:

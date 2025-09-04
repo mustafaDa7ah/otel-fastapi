@@ -64,9 +64,14 @@ def _root_logger_with_worker() -> logging.Logger:
 def get_logger_with_context(name: str = None) -> logging.Logger:
     """Get a logger with worker context filter already applied"""
     logger = logging.getLogger(name)
+    
+    # Ensure proper error capture
+    logger.setLevel(logging.INFO)
+    
     # Add worker context filter if not already present
     if not any(isinstance(f, _WorkerContextFilter) for f in logger.filters):
         logger.addFilter(_WorkerContextFilter())
+    
     return logger
 
 def setup_telemetry(app, service_name: str = "fastapi-app"):

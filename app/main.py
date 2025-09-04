@@ -4,6 +4,7 @@ from uuid import UUID, uuid4
 from contextlib import asynccontextmanager
 from typing import Optional, List
 
+
 from fastapi import FastAPI, Depends, HTTPException, Request
 
 from opentelemetry import trace, metrics
@@ -12,6 +13,9 @@ from app.core.telemetry import setup_telemetry, get_logger_with_context
 from app.domain.models import User
 from app.use_cases.user_use_cases import UserUseCases
 from app.infrastructure.repositories import MockUserRepository
+
+import math
+from fastapi import HTTPException
 
 # Use the context-aware logger
 logger = get_logger_with_context(__name__)
@@ -166,3 +170,56 @@ async def error_test():
         raise HTTPException(status_code=500, detail="Simulated error")
     logger.info("Error test endpoint succeeded")
     return {"message": "No error this time"}
+
+
+@app.get("/simulate-error")
+async def simulate_error():
+    """Simulate a application error (divide by zero)"""
+    try:
+        # This will cause a ZeroDivisionError
+        result = 1 / 0
+        return {"result": result}
+    except Exception as e:
+        logger.error("Divide by zero error occurred", exc_info=True, extra={
+            "attributes": {"error_type": "ZeroDivisionError", "simulated": True}
+        })
+        raise HTTPException(status_code=500, detail=f"Simulated error: {str(e)}")
+
+@app.get("/simulate-crash")
+async def simulate_crash():
+    """Simulate a application crash"""
+    try:
+        # This will cause a AttributeError
+        nonexistent_function()
+        return {"status": "ok"}
+    except Exception as e:
+        logger.critical("Application crash simulated", exc_info=True, extra={
+            "attributes": {"error_type": "AttributeError", "crash": True}
+        })
+        raise HTTPException(status_code=500, detail=f"Simulated crash: {str(e)}")
+
+@app.get("/simulate-timeout")
+async def simulate_timeout():
+    """Simulate a timeout or slow operation"""
+    import asyncio
+    try:
+        logger.warning("Starting slow operation that might timeout")
+        await asyncio.sleep(10)  # 10 second delay
+        return {"status": "completed"}
+    except asyncio.CancelledError:
+        logger.error("Request timeout occurred", extra={
+            "attributes": {"timeout_seconds": 10, "cancelled": True}
+        })
+        raise HTTPException(status_code=504, detail="Request timeout")
+
+@app.get("/simulate-db-error")
+async def simulate_db_error():
+    """Simulate a database connection error"""
+    try:
+        # Simulate DB connection failure
+        raise ConnectionError("Database connection failed: Connection refused")
+    except Exception as e:
+        logger.error("Database connection error", exc_info=True, extra={
+            "attributes": {"error_type": "ConnectionError", "component": "database"}
+        })
+        raise HTTPException(status_code=503, detail=f"Database error: {str(e)}")

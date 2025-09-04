@@ -6,10 +6,16 @@ receivers:
 
 exporters:
   clickhouse:
-    endpoint: https://g0kx3zs84v.germanywestcentral.azure.clickhouse.cloud:8443
-    database: otel
+    endpoint: https://w2mi3qy9ce.me-central-1.aws.clickhouse.cloud:8443
+    database: otel_z
     username: default
-    password: "snC4MR1F9~anw"
+    password: "tgKnfQyi4~j18"
+  
+  otlp/hyperdx:
+    endpoint: "https://in-otel.hyperdx.io:4317"
+    headers:
+      authorization: "2332b044-2469-4bc1-8fba-b0867470eb84"
+
   debug:
     verbosity: normal
 
@@ -21,12 +27,12 @@ service:
     traces:
       receivers: [otlp]
       processors: [batch]
-      exporters: [clickhouse, debug]
+      exporters: [clickhouse, otlp/hyperdx, debug]  # Send to both!
     metrics:
       receivers: [otlp]
       processors: [batch]
-      exporters: [clickhouse, debug]
+      exporters: [clickhouse, otlp/hyperdx, debug]   # Send to both!
     logs:
       receivers: [otlp]
       processors: [batch]
-      exporters: [clickhouse, debug]
+      exporters: [clickhouse, otlp/hyperdx, debug]    # Send to both!
