@@ -81,6 +81,23 @@ services:
       - app-network
     restart: on-failure  # Add restart policy
 
+  cube:
+    image: cubejs/cube:latest
+    ports:
+      - "4000:4000"
+    environment:
+      - CUBEJS_DB_TYPE=clickhouse
+      - CUBEJS_DB_HOST=clickhouse
+      - CUBEJS_DB_PORT=9000
+      - CUBEJS_DB_NAME=default
+      - CUBEJS_DB_USER=default
+      - CUBEJS_DB_PASS=
+      - CUBEJS_DEV_MODE=true
+    volumes:
+      - ./cube:/cube/conf
+    depends_on:
+      - clickhouse
+
 volumes:
   clickhouse_data:
   # grafana_data:

@@ -12,7 +12,7 @@ exporters:
     password: "snC4MR1F9~anw"
   debug:
     verbosity: normal
-
+ 
 processors:
   batch:
 

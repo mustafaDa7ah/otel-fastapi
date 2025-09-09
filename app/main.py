@@ -150,7 +150,7 @@ async def create_async_pipeline(steps: int = 3):
             "pipeline_id": pipeline_id,
             "status": "queued",
             "worker_id": WORKER_ID,
-            "message": "Pipeline sent for async processing"
+            "message": "Pipeline sent for async processing",
             "request_id": request_id
         }
 
