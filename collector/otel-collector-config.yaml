@@ -1,32 +1,107 @@
-receivers:
-  otlp:
-    protocols:
-      grpc:
-      http:
+version: '3.8'
 
-exporters:
-  clickhouse:
-    endpoint: https://g0kx3zs84v.germanywestcentral.azure.clickhouse.cloud:8443
-    database: otel
-    username: default
-    password: "snC4MR1F9~anw"
-  debug:
-    verbosity: normal
- 
-processors:
-  batch:
+services:
+  collector:
+    image: otel/opentelemetry-collector-contrib:0.86.0
+    ports:
+      - "4317:4317"
+      - "4318:4318"
+      - "8889:8889"
+      - "13133:13133"
+    volumes:
+      - ./collector/otel-collector-config.yaml:/etc/otelcol-contrib/config.yaml
+    restart: on-failure
 
-service:
-  pipelines:
-    traces:
-      receivers: [otlp]
-      processors: [batch]
-      exporters: [clickhouse, debug]
-    metrics:
-      receivers: [otlp]
-      processors: [batch]
-      exporters: [clickhouse, debug]
-    logs:
-      receivers: [otlp]
-      processors: [batch]
-      exporters: [clickhouse, debug]
+  app:
+    build: .
+    ports:
+      - "8000:8000"
+    environment:
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://collector:4318
+      - OTEL_SERVICE_NAME=fastapi-app
+    depends_on:
+      collector:
+        condition: service_started
+    volumes:
+      - .:/app
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+
+  zookeeper:
+    image: confluentinc/cp-zookeeper:7.4.0
+    environment:
+      ZOOKEEPER_CLIENT_PORT: 2181
+      ZOOKEEPER_TICK_TIME: 2000
+    networks:
+      - app-network
+    healthcheck:
+      test: echo stat | nc localhost 2181 || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  kafka:
+    image: confluentinc/cp-kafka:7.4.0
+    depends_on:
+      zookeeper:
+        condition: service_healthy
+    environment:
+      KAFKA_BROKER_ID: 1
+      KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: 'true'
+    ports:
+      - "9092:9092"
+    networks:
+      - app-network
+    healthcheck:
+      test: nc -z localhost 9092 || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 20
+      start_period: 40s
+
+  kafka-consumer:
+    build: .
+    command: >
+      sh -c "sleep 20 && python -m app.consumer_start"
+    environment:
+      - OTEL_EXPORTER_OTLP_ENDPOINT=http://collector:4318
+      - WORKER_ID=kafka-consumer-1
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+    depends_on:
+      kafka:
+        condition: service_healthy
+      collector:
+        condition: service_started
+    networks:
+      - app-network
+    restart: on-failure
+
+  # 👇 Add Cube.js service here
+  cube:
+    image: cubejs/cube:latest
+    ports:
+      - "4000:4000"  # Cube API
+      - "3000:3000"  # Cube Playground
+    environment:
+      - CUBEJS_DEV_MODE=true
+      - CUBEJS_DB_TYPE=clickhouse
+      - CUBEJS_DB_HOST=g0kx3zs84v.germanywestcentral.azure.clickhouse.cloud
+      - CUBEJS_DB_PORT=8443
+      - CUBEJS_DB_SSL=true
+      - CUBEJS_DB_NAME=otel
+      - CUBEJS_DB_USER=default
+      - CUBEJS_DB_PASS=snC4MR1F9~anw
+      - CUBEJS_API_SECRET=my-secret
+    volumes:
+      - ./schema:/cube/conf/schema
+    networks:
+      - app-network
+
+volumes:
+  clickhouse_data:
+
+networks:
+  app-network:
+    driver: bridge
